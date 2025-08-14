@@ -123,7 +123,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Archive.c" />
     <ClCompile Include="main.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Archive.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="test_archive.dsp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Test.txt" />
+    <Text Include="Test2.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
