@@ -124,10 +124,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Archive.c" />
+    <ClCompile Include="Compression.c" />
+    <ClCompile Include="ConsoleIO.c" />
     <ClCompile Include="main.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Archive.h" />
+    <ClInclude Include="Compression.h" />
+    <ClInclude Include="ConsoleIO.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="test_archive.dsp" />
@@ -135,6 +139,9 @@
   <ItemGroup>
     <Text Include="Test.txt" />
     <Text Include="Test2.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Severance S01E04.mp4" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

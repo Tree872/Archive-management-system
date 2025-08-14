@@ -1,9 +1,15 @@
 #include <Windows.h>
 #include <sys/stat.h>
 #include <stdio.h> 
+#include <string.h>
 #include "Archive.h"
 
 int main(void) {
-  addFile("test_archive.dsp", "Test.txt"); 
-  addFile("test_archive.dsp", "Test2.txt");
+  //createArchive("test_archive");
+  //addFile("test_archive.dsp", "book.txt");
+  char testString[100] = "„¤\0";
+  printf("%d\n", (int)strlen(testString));
+  printf("„¥„Ÿ ");
+  printf("„¤„Ÿ ");
+
 }

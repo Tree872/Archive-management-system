@@ -1,4 +1,5 @@
 #pragma once
+#include <stdio.h>
 
 typedef struct {
   char path[256];
@@ -15,3 +16,4 @@ typedef struct {
 
 void createArchive(const char* fileName);
 void addFile(const char* archive, const char* entryPath);
+size_t rle_compress(const char* chunk, size_t chunkLength, char* compressedChunk);
