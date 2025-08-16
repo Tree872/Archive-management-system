@@ -6,7 +6,7 @@
 #define TREE_HORIZONTAL "„Ÿ"
 // Node representing a file or directory
 typedef struct PathNode {
-  char relativePath[256];               // 
+  char relativePath[256];
   bool isFile;         // 1 if file, 0 if directory
   struct PathNode** children;   // array of pointers to children nodes
   int childCount;               // number of children

@@ -15,16 +15,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.c">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Archive.c">
+    <ClCompile Include="Archive.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Compression.c">
+    <ClCompile Include="Compression.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ConsoleIO.c">
+    <ClCompile Include="ConsoleIO.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

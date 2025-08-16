@@ -123,10 +123,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Archive.c" />
-    <ClCompile Include="Compression.c" />
-    <ClCompile Include="ConsoleIO.c" />
-    <ClCompile Include="main.c" />
+    <ClCompile Include="Archive.cpp" />
+    <ClCompile Include="Compression.cpp" />
+    <ClCompile Include="ConsoleIO.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Archive.h" />

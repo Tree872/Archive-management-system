@@ -1,11 +1,9 @@
 #pragma once
 #include <stdint.h>
-#define WINDOW_SIZE 1024
-#define LOOKAHEAD_SIZE 10
+#define WINDOW_SIZE 4096
 
-typedef struct {
-  uint16_t distance;
-  uint8_t length;
-} LZ77Token;
+typedef uint16_t LZ77PackedToken;
 
-size_t lz77_compress(const uint8_t* input, size_t inputSize, uint8_t* output);
+int lzssEncode(const char* input, int inputSize, char* output);
+void unpackToken(uint16_t packed, uint16_t* offset, uint8_t* length);
+LZ77PackedToken packToken(uint16_t offset, uint8_t length);

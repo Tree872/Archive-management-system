@@ -14,6 +14,9 @@ typedef struct {
   unsigned long long entryCount;
 } ArchiveHeader;
 
+
 void createArchive(const char* fileName);
-void addFile(const char* archive, const char* entryPath);
-size_t rle_compress(const char* chunk, size_t chunkLength, char* compressedChunk);
+FILE* openArchive(const char* fileName);
+void addFile(FILE* archivePtr, const char* entryPath);
+int addDirectory(FILE* archivePtr, const char* entryPath);
+void closeArchive(FILE* archivePtr);
