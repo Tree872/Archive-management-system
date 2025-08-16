@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <stdint.h>
 
-#define CHUNK_SIZE 1024 * 1024
+#define CHUNK_SIZE 32768 * 4
 
 void createArchive(const char* fileName) {
   char fileFullName[256];
@@ -66,33 +66,31 @@ void addFile(FILE* archivePtr, const char* filePath) {
     printf("%s\n", filePath);
     return;
   }
-  char *buffer = (char*)malloc(CHUNK_SIZE);
-  char* compressedBuffer = (char*)malloc(CHUNK_SIZE);
+  char buffer[CHUNK_SIZE];
+  char compressedBuffer[CHUNK_SIZE * 2];
 
   if (buffer == NULL || compressedBuffer == NULL) {
     free(buffer);
     free(compressedBuffer);
     return;
   }
+
   size_t byteWritten = 0;
   size_t byteReadTotal = 0;
   unsigned int bytesRead;
   while ((bytesRead = fread(buffer, 1, CHUNK_SIZE, entryPointer)) > 0) {
     byteReadTotal += bytesRead;
-    if (1) { // No compression for now
-      byteWritten += bytesRead + 4;
-      fwrite(&bytesRead, sizeof(bytesRead), 1, archivePtr);
-      fwrite(buffer, 1, bytesRead, archivePtr);
-    } 
+    int compressedSize = lzssEncode(buffer, bytesRead, compressedBuffer);
+    fwrite(compressedBuffer, 1, compressedSize, archivePtr);
+    byteWritten += compressedSize;
+    printf("Compressed %zu bytes to %d bytes\n", bytesRead, compressedSize);
     
   }
-  free(buffer);
-  free(compressedBuffer);
   
   strcpy_s(header.path, sizeof(header.path), filePath);
-  header.isFile = 1; 
-  header.isCompressed = 0; 
-  header.isEncrypted = 0; 
+  header.isFile = 1;
+  header.isCompressed = 1;
+  header.isEncrypted = 0;
   header.originalSize = byteReadTotal;
   header.storedSize = byteWritten;
   // Update the header at the beginning of the archive

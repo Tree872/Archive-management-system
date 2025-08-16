@@ -2,22 +2,25 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <queue>
 #include <string>
-typedef uint16_t LZ77PackedToken;
+
 // Set the nth bit of x (leftmost bit is 0)
 #define SET_BIT(x, n) ((x) | (0b10000000 >> (n)))
+// Check if the nth bit of x is set (leftmost bit is 0)
+#define CHECK_BIT(x, n) ((x) & (0b10000000 >> (n)))
 
 #define MIN_MATCH 3
-#define MAX_MATCH 15 + MIN_MATCH 
+#define MAX_MATCH 18
 #define WINDOW_SIZE 4096
 
-uint16_t packToken(uint16_t offset, uint8_t length) {
-  return (offset << 4) | ((length - MIN_MATCH) & 0xFF);
+LZSSPackedToken packToken(uint16_t offset, uint8_t length) {
+  return (offset - 1 << 4) | ((length - MIN_MATCH) & 0xFF);
 }
 
-void unpackToken(uint16_t packed, uint16_t* offset, uint8_t* length) {
-  *offset = packed >> 4;
-  *length = (packed & 0xFF) + MIN_MATCH; 
+void unpackToken(LZSSPackedToken packed, uint16_t* offset, uint8_t* length) {
+  *offset = (packed >> 4) + 1;
+  *length = (packed & 0x0F) + MIN_MATCH; 
 }
 
 int lzssEncode(const char* input, int inputSize, char* output) {
@@ -30,13 +33,15 @@ int lzssEncode(const char* input, int inputSize, char* output) {
   int slidingWindowStart = 0;
   int slidingWindowEnd = MIN_MATCH - 1; 
   int outputSize = 4; // Will be used as index for output
+
   // This variable cycles through 0 to 7, representing the bits in the current byte
-  int flagCounter = 3; // Start with 3 since the first 3 bytes are always literals
-  int flagPos = 0; // Position in the output for current the flag byte
+  // Start with 3 since the first 3 bytes are always literals
+  int flagCounter = 3; 
+  int flagPos = 0; // Position in the output to be reserved for the flag byte
   char flagByte = 0x00; // The flag byte itself to indicate literals and matches
   // Key: 3-byte substring, Value: list of start indices
-  std::unordered_map<std::string, std::vector<int>> windowSlide; 
-  // Initialize with the first MIN_MATCH bytes
+  std::unordered_map<std::string, std::deque<int>> windowSlide; 
+  // Initialize with the first substring at index 0
   windowSlide.insert({std::string(input, MIN_MATCH), {0}});
 
   for (int i = 1; i <= MIN_MATCH; i++) {
@@ -45,8 +50,8 @@ int lzssEncode(const char* input, int inputSize, char* output) {
   }
   // For each byte in the input
   for (int i = MIN_MATCH; i < inputSize; i++) {
-    std::cout << slidingWindowStart << " " << slidingWindowEnd << std::endl;
-    std::cout << "Current window: " << std::string(input + slidingWindowStart, slidingWindowEnd - slidingWindowStart + 1) << std::endl;
+    //std::cout << slidingWindowStart << " " << slidingWindowEnd << std::endl;
+    //std::cout << "Current window: " << std::string(input + slidingWindowStart, slidingWindowEnd - slidingWindowStart + 1) << std::endl;
     std::string currentSubstring;
     if (i + MIN_MATCH <= inputSize) {     
       currentSubstring.assign(input + i, MIN_MATCH);
@@ -60,10 +65,10 @@ int lzssEncode(const char* input, int inputSize, char* output) {
     // Check if the current substring exists in the sliding window
     if (windowSlide.find(currentSubstring) != windowSlide.end()) {
       // Found a match, now find the longest match
-      std::cout << "Found match for: " << currentSubstring << std::endl;
-      std::cout << "Indices in sliding window: ";
+      //std::cout << "Found match for: " << currentSubstring << std::endl;
+      //std::cout << "Indices in sliding window: ";
       for (int index : windowSlide[currentSubstring]) {
-        std::cout << index << " ";
+        //std::cout << index << " ";
       }
       // For each starting index of the current substring in the sliding window
       for (int startIndex : windowSlide[currentSubstring]) {
@@ -85,9 +90,9 @@ int lzssEncode(const char* input, int inputSize, char* output) {
           longestMatchOffset = i - startIndex;
         }
       }
-      std::cout << "Longest match length: " << longestMatchLength << ", offset: " << longestMatchOffset << std::endl;
+      //std::cout << "Longest match length: " << longestMatchLength << ", offset: " << longestMatchOffset << std::endl;
       // Pack the token and write it to output
-      LZ77PackedToken packedToken = packToken(longestMatchOffset, longestMatchLength);
+      LZSSPackedToken packedToken = packToken(longestMatchOffset, longestMatchLength);
       output[outputSize] = packedToken >> 8; // First byte
       outputSize++;
       output[outputSize] = packedToken & 0xFF; // Second byte
@@ -98,7 +103,7 @@ int lzssEncode(const char* input, int inputSize, char* output) {
     }
     else {
       // No match found, write the literal byte
-      std::cout << "No match found for: " << currentSubstring << std::endl;
+      //std::cout << "No match found for: " << currentSubstring << std::endl;
       output[outputSize] = input[i];
       outputSize++;
       flagCounter++;
@@ -108,28 +113,31 @@ int lzssEncode(const char* input, int inputSize, char* output) {
       // If we have 8 flags or reached the end of input, write the flag byte
       output[flagPos] = flagByte;
       flagPos = outputSize; // Update flag position for next byte
-      outputSize++;
       flagByte = 0x00; // Reset the flag byte
       flagCounter = 0; // Reset the counter
+      if (i != inputSize - 1) {
+        outputSize++; 
+      }
     }
-    std::cout << "Current output size: " << outputSize << std::endl;
+    // std::cout << "Current output size: " << outputSize << std::endl;
     // Adding new substrings to the sliding window
     for (int j = 0; j < longestMatchLength; j++) {
       slidingWindowEnd++;
-      std::cout << "Adding substring: " << std::string(input + slidingWindowEnd - MIN_MATCH + 1, MIN_MATCH) << std::endl;
-      if (i + j + 1 < inputSize - MIN_MATCH) { // Ensure we don't go out of bounds
-        std::string newSubstring(input + slidingWindowEnd - MIN_MATCH + 1, MIN_MATCH);
-        windowSlide[newSubstring].push_back(slidingWindowEnd - MIN_MATCH + 1);
-      }
+      int newIndex = slidingWindowEnd - MIN_MATCH + 1;
+
+      std::string newSubstring(input + newIndex, MIN_MATCH);
+      windowSlide[newSubstring].push_back(newIndex);
+      //std::cout << "Adding new substring: " << newSubstring << " at index " << newIndex << std::endl;
     }
 
     while (slidingWindowEnd - slidingWindowStart + 1 > WINDOW_SIZE) {
       // If the sliding window exceeds the size, remove the oldest entry
       std::string oldestSubstring(input + slidingWindowStart, MIN_MATCH);
       if (windowSlide.find(oldestSubstring) != windowSlide.end()) {
-        std::vector<int> &indices = windowSlide[oldestSubstring];
+        std::deque<int> &indices = windowSlide[oldestSubstring];
         // remove from the front
-        indices.erase(indices.begin());
+        //std::cout << "Removing oldest substring: " << oldestSubstring << " at index " << slidingWindowStart << std::endl;
+        indices.pop_front();
         if (indices.empty()) {
           windowSlide.erase(oldestSubstring); // Remove the entry if no indices left
         }
@@ -139,6 +147,51 @@ int lzssEncode(const char* input, int inputSize, char* output) {
 
   }
   return outputSize;
+}
 
-
+int lzssDecode(const char* input, int inputSize, char* output) {
+  if (inputSize < 1) {
+    return 0; // No data to decode
+  }
+  int outputSize = 0;
+  int inputIndex = 1;
+  char flagByte = input[0];
+  int flagCounter = 0;
+  while (inputIndex < inputSize) {
+    if (flagCounter == 8) {
+      // Read the next flag byte
+      flagByte = input[inputIndex];
+      inputIndex++;
+      flagCounter = 0;
+    }
+    if (CHECK_BIT(flagByte, flagCounter)) {
+      // It's a match token
+      if (inputIndex + 1 >= inputSize) {
+        break; // Not enough data for a token
+      }
+      char firstByte = input[inputIndex];
+      char secondByte = input[inputIndex + 1];
+      LZSSPackedToken packedToken = (firstByte << 8) | (secondByte & 0xFF);
+      inputIndex += 2;
+      uint16_t offset;
+      uint8_t length;
+      unpackToken(packedToken, &offset, &length);
+      std::cout << "Offset: " << offset << ", Length: " << (int)length << std::endl;
+      // Copy the matched string from the output buffer
+      for (int i = 0; i < length; i++) {
+        output[outputSize] = output[outputSize - offset];
+        outputSize++;
+      }
+    } else {
+      // It's a literal byte
+      if (inputIndex >= inputSize) {
+        break; // No more data
+      }
+      output[outputSize] = input[inputIndex];
+      inputIndex++;
+      outputSize++;
+    }
+    flagCounter++;
+  }
+  return outputSize;
 }
