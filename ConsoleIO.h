@@ -8,7 +8,7 @@
 #define TREE_BRANCH_END "`-- "
 
 typedef struct PathNode {
-    char relativePath[256];     // name of thsi file or folder
+    char relativePath[256];     // name of this file or folder
     bool isFile;                // true if file, false if directory
     struct PathNode** children; // array of pointers to children nodes
 	int childCount;             // number of children
