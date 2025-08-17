@@ -20,7 +20,19 @@ int main() {
   FILE* archivePtr = openArchive("test_archive");
   addFile(archivePtr, "Galaxy.dll");
   closeArchive(archivePtr);
+
   
+PathNode* root = createNode("ROOT", false);
+
+addPath(root, "src/main.c");
+addPath(root, "src/utils/helpers.c");
+addPath(root, "src/utils/io.c");
+addPath(root, "include/main.h");
+addPath(root, "README.md");
+addPath(root, "docs/usage.txt");
+
+printTree(root);
+freeTree(root);
 
   return 0;
 }
