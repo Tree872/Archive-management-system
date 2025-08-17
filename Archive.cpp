@@ -8,6 +8,14 @@
 #include <Windows.h>
 #include <stdint.h>
 
+// FUNCTION : createArchive
+// DESCRIPTION:
+//    Creates a new archive file with the specified name.
+//    The archive file is created with an initial header indicating no entries.
+// PARAMETERS:
+//    const char* fileName : The name of the archive file to create (without extension).
+// RETURNS:
+//    void
 void createArchive(const char* fileName) {
   char fileFullName[256];
   sprintf_s(fileFullName, sizeof(fileFullName), "%s.dsp", fileName);
@@ -25,7 +33,14 @@ void createArchive(const char* fileName) {
     return;
   }
 }
-
+// FUNCTION : openArchive
+// DESCRIPTION:
+//    Opens an existing archive file for reading and writing.
+//    The file is expected to have a .dsp extension.
+// PARAMETERS:
+//    const char* fileName : The name of the archive file to open (without extension).
+// RETURNS:
+//    FILE* : Pointer to the opened file, or NULL if the file could not be opened.
 FILE* openArchive(const char* fileName) {
   char fileFullName[256];
   sprintf_s(fileFullName, sizeof(fileFullName), "%s.dsp", fileName);
@@ -37,6 +52,13 @@ FILE* openArchive(const char* fileName) {
   }
   return filePointer;
 }
+// FUNCTION : closeArchive
+// DESCRIPTION:
+//    Closes the archive file pointer.
+// PARAMETERS:
+//    FILE* archivePtr : Pointer to the archive file to close.
+// RETURNS:
+//    void
 void closeArchive(FILE* archivePtr) {
   if (archivePtr != NULL) {
     if (fclose(archivePtr) != 0) {
@@ -44,7 +66,18 @@ void closeArchive(FILE* archivePtr) {
     }
   }
 }
-
+// FUNCTION : addFile
+// DESCRIPTION:
+//    Adds a file to the archive.
+//    The file is read in chunks, compressed if necessary, and written to the archive.
+//    The file path is stored in the archive header.
+//    Each entry is added as a node in the tree structure.
+// PARAMETERS:
+//    FILE* archivePtr : Pointer to the archive file where the file will be added.
+//    const char* filePath : The path of the file to add to the archive.
+//    PathNode* root : Pointer to the root of the tree structure for managing paths.
+// RETURNS:
+//    void
 void addFile(FILE* archivePtr, const char* filePath, PathNode* root) {
   if (archivePtr == NULL) {
     perror("Error: Archive pointer is NULL");
@@ -141,7 +174,16 @@ void addFile(FILE* archivePtr, const char* filePath, PathNode* root) {
     return;
   }
 }
-
+// FUNCTION : unpackArchive
+// DESCRIPTION:
+//    Unpacks the contents of the archive to the specified output directory.
+//    It reads the archive header, iterates through each entry, and extracts files or directories.
+//    Uncompressed data if the compressed flag is set, and writes it to the output directory.
+// PARAMETERS:
+//    FILE* archivePtr : Pointer to the archive file to unpack.
+//    const char* outputDir : The directory where the unpacked files will be stored.
+// RETURNS:
+//    void
 void unpackArchive(FILE* archivePtr, const char* outputDir) {
   if (archivePtr == NULL) {
     perror("Error: Archive pointer is NULL");
@@ -203,7 +245,17 @@ void unpackArchive(FILE* archivePtr, const char* outputDir) {
   free(readBuffer);
   free(writeBuffer);
 }
-
+// FUNCTION : addDirectory
+// DESCRIPTION:
+//    Adds a directory and its contents to the archive.
+//    It recursively traverses the directory structure, adding files and subdirectories.
+//    Each entry is added as a node in the tree structure.
+// PARAMETERS:
+//    FILE* archivePtr : Pointer to the archive file where the directory will be added.
+//    const char* entryPath : The path of the directory to add to the archive.
+//    PathNode* root : Pointer to the root of the tree structure for managing paths.
+// RETURNS:
+//    int : The number of entries added to the archive (files and directories).
 int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root) {
   int readEntries = 0;
   if (archivePtr == NULL) {
@@ -211,7 +263,6 @@ int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root) {
     return readEntries;
   }
 
-  
   LPWIN32_FIND_DATAA findFileData = (LPWIN32_FIND_DATAA)malloc(sizeof(WIN32_FIND_DATAA));
   if (findFileData == NULL) {
     perror("Error allocating memory for find data");
@@ -221,13 +272,15 @@ int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root) {
   char searchPath[512];
   snprintf(searchPath, sizeof(searchPath), "%s\\*", entryPath);
   hFind = FindFirstFileA(searchPath, findFileData);
+
   if (hFind == INVALID_HANDLE_VALUE) {
     perror("Error opening directory");
     return readEntries;
   }
+
   fseek(archivePtr, 0, SEEK_END); // Move to the end of the file
   size_t headerPos = _ftelli64(archivePtr);
-  // Update the header at the beginning of the archive
+  // Update the header at the beginning of the entry
   EntryHeader header;
   strcpy_s(header.path, sizeof(header.path), entryPath);
   header.isFile = 0;
@@ -237,6 +290,7 @@ int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root) {
   header.storedSize = 0;
   fseek(archivePtr, headerPos, SEEK_SET);
   fwrite(&header, sizeof(header), 1, archivePtr);
+
   addPath(root, entryPath); // Add the directory to the tree structure
   // Loop through all files and directories in the specified directory
   while (1) {
@@ -269,18 +323,36 @@ int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root) {
   fwrite(&archiveHeader, sizeof(archiveHeader), 1, archivePtr); // Write updated header
   return readEntries + 1;
 }
-
+// FUNCTION : fileOrDirectoryExists
+// DESCRIPTION:
+//    Checks if a file or directory exists at the specified path.
+// PARAMETERS:
+//    const char* filePath : The path to the file or directory to check.
+// RETURNS:
+//    int : 1 if the file or directory exists, 0 otherwise.
 int fileOrDirectoryExists(const char* filePath) {
   DWORD attributes = GetFileAttributesA(filePath);
   return attributes != INVALID_FILE_ATTRIBUTES;
 }
-
+// FUNCTION : isFile
+// DESCRIPTION:
+//    Checks if the specified path is a file.
+// PARAMETERS:
+//    const char* filePath : The path to the file to check.
+// RETURNS:
+//    int : 1 if the path is a file, 0 if it is a directory or does not exist.
 int isFile(const char* filePath) {
   DWORD attributes = GetFileAttributesA(filePath);
   return attributes != INVALID_FILE_ATTRIBUTES &&
     !(attributes & FILE_ATTRIBUTE_DIRECTORY);
 }
-
+// FUNCTION : isDirectory
+// DESCRIPTION:
+//    Checks if the specified path is a directory.
+// PARAMETERS:
+//    const char* filePath : The path to the directory to check.
+// RETURNS:
+//    int : 1 if the path is a directory, 0 if it is a file or does not exist.
 int isDirectory(const char* filePath) {
   DWORD attributes = GetFileAttributesA(filePath);
   return attributes != INVALID_FILE_ATTRIBUTES &&

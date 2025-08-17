@@ -373,3 +373,6 @@ FodyWeavers.xsd
 /Update
 /test_archive
 /test/Update
+/test2/SampleDir
+/test2.dsp
+/test.dsp

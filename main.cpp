@@ -31,7 +31,9 @@ int main() {
 				printf("Archive name cannot be empty.\n");
 				break;
 			}
-			if (fileOrDirectoryExists(archiveName)) {
+      char archiveFullName[256];
+      sprintf_s(archiveFullName, sizeof(archiveFullName), "%s.dsp", archiveName);
+			if (fileOrDirectoryExists(archiveFullName)) {
 				printf("An archive with this name already exists. Please choose a different name.\n");
 				break;
 			}
