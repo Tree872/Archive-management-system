@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include "Tree.h"
 
-#define _CRT_SECURE_NO_WARNINGS
-
 PathNode* createNode(const char* name, bool isFile) {
   PathNode* node = (PathNode*)malloc(sizeof(PathNode));
   if (!node) {

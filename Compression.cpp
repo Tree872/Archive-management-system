@@ -28,12 +28,12 @@ int lzssEncode(const char* input, int inputSize, char* output) {
   char flagByte = 0x00; // The flag byte itself to indicate literals and matches
 
   // Key: 3-byte substring, Value: list of start indices
-  robin_hood::unordered_map<uint32_t, IndexQueue> windowSlide;
+  robin_hood::unordered_map<uint32_t, IndexQueue> substringIndexMap;
   IndexQueue initialQueue;
   initIndexQueue(&initialQueue);
   // Initialize with the first substring at index 0
   pushIndexQueue(&initialQueue, 0);
-  windowSlide.insert({packToUInt32(input), initialQueue});
+  substringIndexMap.insert({packToUInt32(input), initialQueue});
 
   // Initialize the output with the first MIN_MATCH bytes as literals
   for (int i = 1; i <= MIN_MATCH; i++) {
@@ -48,15 +48,15 @@ int lzssEncode(const char* input, int inputSize, char* output) {
     int longestMatchLength = 1; // Equal 1 when no match is found
     int longestMatchOffset = 0;
     // Check if the current substring exists in the sliding window
-    if (windowSlide.contains(currentSubstring) && i + MIN_MATCH <= inputSize) {
+    if (substringIndexMap.contains(currentSubstring) && i + MIN_MATCH <= inputSize) {
       
-      int headQueue = windowSlide[currentSubstring].head;
-      int tailQueue = windowSlide[currentSubstring].tail;
+      int headQueue = substringIndexMap[currentSubstring].head;
+      int tailQueue = substringIndexMap[currentSubstring].tail;
 
       // For each starting index of the current substring in the sliding window
-      for (int j = 0; j < windowSlide[currentSubstring].length; j++) {
+      for (int j = 0; j < substringIndexMap[currentSubstring].length; j++) {
         int queueIndex = (headQueue + j) % MAX_OCCURRENCE_PER_SUBSTRING;
-        int startIndex = windowSlide[currentSubstring].buffer[queueIndex];
+        int startIndex = substringIndexMap[currentSubstring].buffer[queueIndex];
         int matchLength = MIN_MATCH;
         // Check how long the match continues
         while (1) {
@@ -114,25 +114,25 @@ int lzssEncode(const char* input, int inputSize, char* output) {
       int newIndex = slidingWindowEnd - MIN_MATCH + 1;
       uint32_t newSubstring = packToUInt32(input + newIndex);
 
-      if (!windowSlide.contains(newSubstring)) {
+      if (!substringIndexMap.contains(newSubstring)) {
         // If the substring is not already in the map, create a new queue
         IndexQueue newIndexQueue;
         initIndexQueue(&newIndexQueue);
-        windowSlide[newSubstring] = newIndexQueue;
+        substringIndexMap[newSubstring] = newIndexQueue;
       }
       // Add the new index to the queue for this substring
-      pushIndexQueue(&windowSlide[newSubstring], newIndex);
+      pushIndexQueue(&substringIndexMap[newSubstring], newIndex);
     }
     
     // Remove oldest substrings if the sliding window exceeds the size
     while (slidingWindowEnd - slidingWindowStart + 1 > WINDOW_SIZE) {
       uint32_t oldestSubstring = packToUInt32(input + slidingWindowStart);
-      if (windowSlide.contains(oldestSubstring)) {
-        IndexQueue &indices = windowSlide[oldestSubstring];
+      if (substringIndexMap.contains(oldestSubstring)) {
+        IndexQueue &indices = substringIndexMap[oldestSubstring];
         // Remove from the front
         popIndexQueue(&indices);
         if (indices.length < 1) {
-          windowSlide.erase(oldestSubstring); // Remove the entry if no indices left
+          substringIndexMap.erase(oldestSubstring); // Remove the entry if no indices left
         }
  
       }

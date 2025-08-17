@@ -98,11 +98,9 @@ int main() {
 				printf("No archive is currently open. Please create or open an archive first.\n");
 				break;
 			}
-			char outputDir[256];
-			strcpy_s(outputDir, sizeof(outputDir), currentArchive);
-			outputDir[strlen(outputDir) - 3] = '\0'; // Remove extension
-			unpackArchive(archivePtr, outputDir);
-			printf("Archive '%s.dsp' unpacked to directory '%s'.\n", currentArchive, outputDir);
+      printf("Unpacking archive '%s.dsp'...\n", currentArchive);
+			unpackArchive(archivePtr, currentArchive);
+			printf("Archive '%s.dsp' unpacked to directory '%s'.\n", currentArchive, currentArchive);
 			break;
 		case 6:
 			if (strcmp(currentArchive, "None") == 0) {
