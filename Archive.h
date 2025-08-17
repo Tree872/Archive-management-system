@@ -2,6 +2,8 @@
 #include "Tree.h"
 #include <stdio.h>
 
+#define CHUNK_SIZE 32768 // 32 KB
+
 typedef struct {
   char path[256];
   unsigned long long originalSize;
@@ -14,7 +16,6 @@ typedef struct {
 typedef struct {
   unsigned long long entryCount;
 } ArchiveHeader;
-
 
 void createArchive(const char* fileName);
 FILE* openArchive(const char* fileName);

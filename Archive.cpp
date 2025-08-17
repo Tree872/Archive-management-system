@@ -8,8 +8,6 @@
 #include <Windows.h>
 #include <stdint.h>
 
-#define CHUNK_SIZE 32768 // 32 KB
-
 void createArchive(const char* fileName) {
   char fileFullName[256];
   sprintf_s(fileFullName, sizeof(fileFullName), "%s.dsp", fileName);

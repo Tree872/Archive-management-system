@@ -1,5 +1,4 @@
-﻿#include <Windows.h>
-#include <stdio.h> 
+﻿#include <stdio.h> 
 #include <string.h>
 #include <stdint.h>
 #include <vector>
@@ -15,11 +14,120 @@ void flushInputStream();
 
 int main() {
   char currentArchive[256] = "None";
-  PathNode* root = createNode("root", false);
+  PathNode* root = createNode("ROOT", false);
+	int entriesAdded = 0;
+	FILE* archivePtr = NULL;
 
-  
+	while (1) {
+    char archiveName[256]; // For user input
+    int choice;
+    printMenu(currentArchive);
+    promptInt("Enter your choice (1-7): ", &choice);
+		switch (choice) {
+		case 1:
+      archiveName[0] = '\0'; 
+			promptString("Enter archive name (without extension): ", archiveName, sizeof(archiveName));
+			if (strlen(archiveName) == 0) {
+				printf("Archive name cannot be empty.\n");
+				break;
+			}
+			if (fileOrDirectoryExists(archiveName)) {
+				printf("An archive with this name already exists. Please choose a different name.\n");
+				break;
+			}
+			createArchive(archiveName);
+			freeTree(root); // Free existing tree if any
+			root = createNode("ROOT", false); // Reset tree
+			printf("Archive '%s.dsp' created successfully.\n", archiveName);
+			break;
+		case 2:
+			archiveName[0] = '\0';
+			promptString("Enter archive name to open (without extension): ", archiveName, sizeof(archiveName));
+			if (strlen(archiveName) == 0) {
+				printf("Archive name cannot be empty.\n");
+				break;
+			}
+			archivePtr = openArchive(archiveName);
+			if (archivePtr != NULL) {
+				freeTree(root); // Free existing tree if any
+				root = createNode("ROOT", false); // Reset tree
+				printf("Archive '%s.dsp' opened successfully.\n", archiveName);
+				strcpy_s(currentArchive, sizeof(currentArchive), archiveName);
+			}
+			break;
+		case 3:
+			if (strcmp(currentArchive, "None") == 0) {
+				printf("No archive is currently open. Please create or open an archive first.\n");
+				break;
+			}
+			char filePath[256];
+			promptString("Enter file path to add: ", filePath, sizeof(filePath));
+			if (strlen(filePath) == 0) {
+				printf("File path cannot be empty.\n");
+				break;
+			}
+			if (!fileOrDirectoryExists(filePath) || !isFile(filePath)) {
+				printf("The specified file does not exist.\n");
+				break;
+			}
+			addFile(archivePtr, filePath, root);
+      entriesAdded++;
+			printf("File '%s' added to archive '%s.dsp'.\n", filePath, currentArchive);
+			break;
+		case 4:
+			if (strcmp(currentArchive, "None") == 0) {
+				printf("No archive is currently open. Please create or open an archive first.\n");
+				break;
+			}
+			char dirPath[256];
+			promptString("Enter directory path to add: ", dirPath, sizeof(dirPath) - 1);
+			if (strlen(dirPath) == 0) {
+				printf("Directory path cannot be empty.\n");
+				break;
+			}
+			if (!fileOrDirectoryExists(dirPath) || !isDirectory(dirPath)) {
+				printf("The specified directory does not exist.\n");
+				break;
+			}
+      printf("Adding directory '%s' to archive '%s.dsp'...\n", dirPath, currentArchive);
+			entriesAdded = addDirectory(archivePtr, dirPath, root);
+			printf("Directory '%s' added to archive '%s.dsp' with %d entries.\n", dirPath, currentArchive, entriesAdded);
+			break;
+		case 5:
+			if (strcmp(currentArchive, "None") == 0) {
+				printf("No archive is currently open. Please create or open an archive first.\n");
+				break;
+			}
+			char outputDir[256];
+			strcpy_s(outputDir, sizeof(outputDir), currentArchive);
+			outputDir[strlen(outputDir) - 3] = '\0'; // Remove extension
+			unpackArchive(archivePtr, outputDir);
+			printf("Archive '%s.dsp' unpacked to directory '%s'.\n", currentArchive, outputDir);
+			break;
+		case 6:
+			if (strcmp(currentArchive, "None") == 0) {
+				printf("No archive is currently open. Please create or open an archive first.\n");
+				break;
+			}
+			if (entriesAdded == 0) {
+				printf("No entries in the archive '%s.dsp'.\n", currentArchive);
+				break;
+      }
+			printf("Contents of archive '%s.dsp':\n", currentArchive);
+			printTree(root);
+			break;
+		case 7:
+			if (strcmp(currentArchive, "None") != 0) {
+				closeArchive(archivePtr);
+			}
+			printf("Exiting program.\n");
+			return 0;
+    default:
+      printf("Invalid choice. Please enter a number between 1 and 7.\n");
+      break;
+		}
+	}
 
-  printTree(root);
   freeTree(root);
   return 0;
 }
@@ -31,14 +139,14 @@ void printMenu(const char* currentArchive) {
   printf("3. Add File to Archive\n");
   printf("4. Add Directory to Archive\n");
   printf("5. Unpack Archive\n");
-  printf("6. Exit\n");
+  printf("6. Display Archive Contents\n");
+  printf("7. Exit\n");
 }
 
 // FUNCTION: promptString
 // DESCRIPTION:
 //		Prompts the user for a string input and validates it.
 //		Continues to prompt until a valid string (smaller than the given buffer) is entered.
-//		Allows the user to skip the input by pressing enter.
 // PARAMETERS:
 //		const char* prompt : The prompt message to display to the user.
 //		char* input : Pointer to the character array where the input will be stored.

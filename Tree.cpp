@@ -6,7 +6,6 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
-// Create a new node
 PathNode* createNode(const char* name, bool isFile) {
   PathNode* node = (PathNode*)malloc(sizeof(PathNode));
   if (!node) {
@@ -14,12 +13,7 @@ PathNode* createNode(const char* name, bool isFile) {
     exit(1);
   }
 
-#ifdef _MSC_VER
   strncpy_s(node->relativePath, sizeof(node->relativePath), name, _TRUNCATE);
-#else
-  strncpy(node->relativePath, name, sizeof(node->relativePath) - 1);
-  node->relativePath[sizeof(node->relativePath) - 1] = '\0';
-#endif
 
   node->isFile = isFile;
   node->children = NULL;
@@ -27,17 +21,11 @@ PathNode* createNode(const char* name, bool isFile) {
   return node;
 }
 
-// Add a path to the tree recursively
 static void addPathRecursive(PathNode* current, const char* path) {
   // Make a local copy so we can modify safely
   char buffer[512];
 
-#ifdef _MSC_VER
   strncpy_s(buffer, sizeof(buffer), path, _TRUNCATE);
-#else
-  strncpy(buffer, path, sizeof(buffer) - 1);
-  buffer[sizeof(buffer) - 1] = '\0';
-#endif
 
   // Split path on '\'
   char* slash = strchr(buffer, '\\');
@@ -77,7 +65,6 @@ void addPath(PathNode* root, const char* relativePath) {
   addPathRecursive(root, relativePath);
 }
 
-// Print tree recursively
 static void printTreeRecursive(PathNode* node, const char* prefix, bool isLast) {
   if (strcmp(node->relativePath, "ROOT") != 0) {
     printf("%s%s%s\n",
@@ -101,7 +88,6 @@ void printTree(PathNode* root) {
   }
 }
 
-// Free memory recursively
 void freeTree(PathNode* root) {
   for (int i = 0; i < root->childCount; i++) {
     freeTree(root->children[i]);
