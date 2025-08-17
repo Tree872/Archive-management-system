@@ -1,5 +1,6 @@
 #include "Archive.h"
 #include "Compression.h"
+#include "ConsoleIO.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -8,7 +9,7 @@
 #include <sys/stat.h>
 #include <stdint.h>
 
-#define CHUNK_SIZE 32768 * 4
+#define CHUNK_SIZE 32768 // 32 KB
 
 void createArchive(const char* fileName) {
   char fileFullName[256];
@@ -47,7 +48,7 @@ void closeArchive(FILE* archivePtr) {
   }
 }
 
-void addFile(FILE* archivePtr, const char* filePath) {
+void addFile(FILE* archivePtr, const char* filePath, PathNode* root) {
   if (archivePtr == NULL) {
     perror("Error: Archive pointer is NULL");
     return;
@@ -63,11 +64,10 @@ void addFile(FILE* archivePtr, const char* filePath) {
   errno_t err = fopen_s(&entryPointer, filePath, "rb");
   if (entryPointer == NULL || err != 0) {
     perror("Error opening entry file");
-    printf("%s\n", filePath);
     return;
   }
-  char buffer[CHUNK_SIZE];
-  char compressedBuffer[CHUNK_SIZE * 2];
+  char *buffer = (char*)malloc(CHUNK_SIZE);
+  char *compressedBuffer = (char*)malloc(CHUNK_SIZE * 2);
 
   if (buffer == NULL || compressedBuffer == NULL) {
     free(buffer);
@@ -75,17 +75,51 @@ void addFile(FILE* archivePtr, const char* filePath) {
     return;
   }
 
+  int toCompress = 1;
+  int inARow = 0; 
   size_t byteWritten = 0;
   size_t byteReadTotal = 0;
-  unsigned int bytesRead;
+  char chunkCompressedFlag = 0; // Flag to indicate if the chunk is compressed
+  int bytesRead;
   while ((bytesRead = fread(buffer, 1, CHUNK_SIZE, entryPointer)) > 0) {
     byteReadTotal += bytesRead;
-    int compressedSize = lzssEncode(buffer, bytesRead, compressedBuffer);
-    fwrite(compressedBuffer, 1, compressedSize, archivePtr);
-    byteWritten += compressedSize;
-    printf("Compressed %zu bytes to %d bytes\n", bytesRead, compressedSize);
+    int compressedSize = 0;
+
+    if (toCompress) {
+      compressedSize = lzssEncode(buffer, bytesRead, compressedBuffer);
+    }
+    else {
+      compressedSize = bytesRead + 1; 
+    }
+
+    if (compressedSize > bytesRead) { // If compression is not effective
+      inARow++;
+      if (inARow >= 10) { 
+        toCompress = 0; // Switch to not compressing
+      }
+      chunkCompressedFlag = 0; // Not compressed
+    } 
+    else {
+      chunkCompressedFlag = 1; // Compressed
+      inARow = 0; 
+    }
+    fwrite(&chunkCompressedFlag, sizeof(chunkCompressedFlag), 1, archivePtr); // Write chunk flag
     
+    if (chunkCompressedFlag == 0) {
+      // If not compressed, write the original data
+      fwrite(&bytesRead, sizeof(bytesRead), 1, archivePtr); // Write chunk prefix
+      fwrite(buffer, 1, bytesRead, archivePtr);
+      byteWritten += bytesRead + sizeof(compressedSize) + sizeof(chunkCompressedFlag);
+    }
+    else {
+      fwrite(&compressedSize, sizeof(compressedSize), 1, archivePtr); // Write chunk prefix
+      fwrite(compressedBuffer, 1, compressedSize, archivePtr);
+      byteWritten += compressedSize + sizeof(compressedSize) + sizeof(chunkCompressedFlag);
+    }
+
   }
+  free(buffer);
+  free(compressedBuffer);
   
   strcpy_s(header.path, sizeof(header.path), filePath);
   header.isFile = 1;
@@ -103,23 +137,98 @@ void addFile(FILE* archivePtr, const char* filePath) {
   archiveHeader.entryCount++;
   fseek(archivePtr, 0, SEEK_SET);
   fwrite(&archiveHeader, sizeof(archiveHeader), 1, archivePtr); // Write updated header
+  addPath(root, filePath); // Add the file to the tree structure
 
   if (fclose(entryPointer) != 0) {
     perror("Error closing entry file");
     return;
   }
-
 }
 
-int addDirectory(FILE* archivePtr, const char* entryPath) {
+void unpackArchive(FILE* archivePtr, const char* outputDir) {
+  if (archivePtr == NULL) {
+    perror("Error: Archive pointer is NULL");
+    return;
+  }
+  fseek(archivePtr, 0, SEEK_SET); // Move to the beginning of the file
+  ArchiveHeader archiveHeader;
+  fread(&archiveHeader, sizeof(archiveHeader), 1, archivePtr);
+  CreateDirectoryA(outputDir, NULL); // Create output directory if it doesn't exist
+  char* readBuffer = (char*)malloc(CHUNK_SIZE * 2);
+  char* writeBuffer = (char*)malloc(CHUNK_SIZE);
+  for (unsigned long long i = 0; i < archiveHeader.entryCount; i++) {
+    EntryHeader entryHeader;
+    fread(&entryHeader, sizeof(entryHeader), 1, archivePtr);
+
+    char fullOutputPath[512];
+    snprintf(fullOutputPath, sizeof(fullOutputPath), "%s\\%s", outputDir, entryHeader.path);
+    
+    if (entryHeader.isFile) {
+      FILE* outputFile;
+      errno_t err = fopen_s(&outputFile, fullOutputPath, "wb");
+      if (err != 0 || outputFile == NULL) {
+        perror("Error creating output file");
+        continue;
+      }
+
+      if (readBuffer == NULL || writeBuffer == NULL) {
+        fclose(outputFile);
+        continue;
+      }
+
+      size_t bytesRead = 0;
+      while (bytesRead < entryHeader.storedSize) {
+        int chunkSize = 0;
+        char chunkCompressedFlag = 0;
+        fread(&chunkCompressedFlag, sizeof(chunkCompressedFlag), 1, archivePtr);
+        fread(&chunkSize, sizeof(chunkSize), 1, archivePtr);
+        bytesRead += sizeof(chunkSize) + sizeof(chunkCompressedFlag);
+        bytesRead += fread(readBuffer, 1, chunkSize, archivePtr);
+        if (chunkCompressedFlag == 0) {
+          // If not compressed, write the original data
+          fwrite(readBuffer, 1, chunkSize, outputFile);
+        } 
+        else if (chunkCompressedFlag == 1) {
+          // If compressed, decompress the data
+          int decompressedSize = lzssDecode(readBuffer, chunkSize, writeBuffer);
+          fwrite(writeBuffer, 1, decompressedSize, outputFile);
+        }
+        
+      }
+      fclose(outputFile);
+    } 
+    else {
+      // Handle directories
+      CreateDirectoryA(fullOutputPath, NULL);
+    }
+   
+  }
+  free(readBuffer);
+  free(writeBuffer);
+}
+
+int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root) {
   int readEntries = 0;
   if (archivePtr == NULL) {
     perror("Error: Archive pointer is NULL");
     return readEntries;
   }
 
+  
+  LPWIN32_FIND_DATAA findFileData = (LPWIN32_FIND_DATAA)malloc(sizeof(WIN32_FIND_DATAA));
+  if (findFileData == NULL) {
+    perror("Error allocating memory for find data");
+    return readEntries;
+  }
+  HANDLE hFind = INVALID_HANDLE_VALUE;
+  char searchPath[512];
+  snprintf(searchPath, sizeof(searchPath), "%s\\*", entryPath);
+  hFind = FindFirstFileA(searchPath, findFileData);
+  if (hFind == INVALID_HANDLE_VALUE) {
+    perror("Error opening directory");
+    return readEntries;
+  }
   fseek(archivePtr, 0, SEEK_END); // Move to the end of the file
-
   size_t headerPos = _ftelli64(archivePtr);
   // Update the header at the beginning of the archive
   EntryHeader header;
@@ -131,38 +240,29 @@ int addDirectory(FILE* archivePtr, const char* entryPath) {
   header.storedSize = 0;
   fseek(archivePtr, headerPos, SEEK_SET);
   fwrite(&header, sizeof(header), 1, archivePtr);
-  LPWIN32_FIND_DATAA findFileData = (LPWIN32_FIND_DATAA)malloc(sizeof(WIN32_FIND_DATAA));
-  if (findFileData == NULL) {
-    perror("Error allocating memory for find data");
-    return readEntries;
-  }
-  HANDLE hFind = INVALID_HANDLE_VALUE;
-  char searchPath[512];
-  snprintf(searchPath, sizeof(searchPath), "%s\\*", entryPath);
-  printf("Searching in: %s\n", searchPath);
-  hFind = FindFirstFileA(searchPath, findFileData);
-  if (hFind == INVALID_HANDLE_VALUE) {
-    perror("Error opening directory");
-    return readEntries;
-  }
+  addPath(root, entryPath); // Add the directory to the tree structure
   // Loop through all files and directories in the specified directory
-  do {
+  while (1) {
     if (strcmp(findFileData->cFileName, ".") != 0 && strcmp(findFileData->cFileName, "..") != 0) {
       char fullPath[512];
       snprintf(fullPath, sizeof(fullPath), "%s\\%s", entryPath, (char*)findFileData->cFileName);
-      if (findFileData->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-        // It's a directory, recursively add it
-        readEntries += addDirectory(archivePtr, fullPath);
-      } else {
+      if (isFile(fullPath)) {
         // It's a file, add it to the archive
-        addFile(archivePtr, fullPath);
+        addFile(archivePtr, fullPath, root);
         readEntries++;
+      } else {
+        // It's a directory, recursively add it
+        readEntries += addDirectory(archivePtr, fullPath, root);
       }
     }
-  } while (FindNextFileA(hFind, findFileData) != 0);
-  free(findFileData);
+    if (FindNextFileA(hFind, findFileData) == 0) {
+      break;
+    }
+  }
 
+  free(findFileData);
   FindClose(hFind);
+
   // Update the entry count in the archive header
   fseek(archivePtr, 0, SEEK_SET);
   ArchiveHeader archiveHeader;
@@ -171,4 +271,21 @@ int addDirectory(FILE* archivePtr, const char* entryPath) {
   fseek(archivePtr, 0, SEEK_SET);
   fwrite(&archiveHeader, sizeof(archiveHeader), 1, archivePtr); // Write updated header
   return readEntries + 1;
+}
+
+int fileOrDirectoryExists(const char* filePath) {
+  DWORD attributes = GetFileAttributesA(filePath);
+  return attributes != INVALID_FILE_ATTRIBUTES;
+}
+
+int isFile(const char* filePath) {
+  DWORD attributes = GetFileAttributesA(filePath);
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+    !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+int isDirectory(const char* filePath) {
+  DWORD attributes = GetFileAttributesA(filePath);
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+    (attributes & FILE_ATTRIBUTE_DIRECTORY);
 }

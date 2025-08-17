@@ -1,4 +1,5 @@
 #pragma once
+#include "ConsoleIO.h"
 #include <stdio.h>
 
 typedef struct {
@@ -17,6 +18,11 @@ typedef struct {
 
 void createArchive(const char* fileName);
 FILE* openArchive(const char* fileName);
-void addFile(FILE* archivePtr, const char* entryPath);
-int addDirectory(FILE* archivePtr, const char* entryPath);
+void addFile(FILE* archivePtr, const char* entryPath, PathNode* root);
+int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root);
+void unpackArchive(FILE* archivePtr, const char* outputDir);
 void closeArchive(FILE* archivePtr);
+
+int fileOrDirectoryExists(const char* path);
+int isFile(const char* path);
+int isDirectory(const char* path);

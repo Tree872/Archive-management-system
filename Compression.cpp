@@ -1,96 +1,88 @@
 #include "Compression.h"
+#include "External\robin_hood.h" 
 #include <iostream>
-#include <unordered_map>
-#include <vector>
-#include <queue>
-#include <string>
 
 // Set the nth bit of x (leftmost bit is 0)
 #define SET_BIT(x, n) ((x) | (0b10000000 >> (n)))
 // Check if the nth bit of x is set (leftmost bit is 0)
 #define CHECK_BIT(x, n) ((x) & (0b10000000 >> (n)))
 
-#define MIN_MATCH 3
-#define MAX_MATCH 18
-#define WINDOW_SIZE 4096
-
 LZSSPackedToken packToken(uint16_t offset, uint8_t length) {
-  return (offset - 1 << 4) | ((length - MIN_MATCH) & 0xFF);
+  return (((offset - 1) & 0x0FFF) << 4) | ((length - MIN_MATCH) & 0x0F);
 }
 
 void unpackToken(LZSSPackedToken packed, uint16_t* offset, uint8_t* length) {
-  *offset = (packed >> 4) + 1;
-  *length = (packed & 0x0F) + MIN_MATCH; 
+  *offset = ((packed >> 4) & 0x0FFF) + 1;
+  *length = (packed & 0x0F) + MIN_MATCH;
 }
 
 int lzssEncode(const char* input, int inputSize, char* output) {
   if (inputSize < MIN_MATCH * 2) { // Not enough data to compress
-    output[0] = 0x00; // No compression flag
-    memcpy(output + 1, input, inputSize);
-    return inputSize + 1; // Return original size + flag byte
+    return -1; // Return -1 to indicate no compression 
   }
 
   int slidingWindowStart = 0;
   int slidingWindowEnd = MIN_MATCH - 1; 
   int outputSize = 4; // Will be used as index for output
-
-  // This variable cycles through 0 to 7, representing the bits in the current byte
-  // Start with 3 since the first 3 bytes are always literals
-  int flagCounter = 3; 
+  int flagCounter = 3; // Track bits for the flag byte 
   int flagPos = 0; // Position in the output to be reserved for the flag byte
   char flagByte = 0x00; // The flag byte itself to indicate literals and matches
-  // Key: 3-byte substring, Value: list of start indices
-  std::unordered_map<std::string, std::deque<int>> windowSlide; 
-  // Initialize with the first substring at index 0
-  windowSlide.insert({std::string(input, MIN_MATCH), {0}});
 
+  // Key: 3-byte substring, Value: list of start indices
+  robin_hood::unordered_map<uint32_t, IndexQueue> windowSlide;
+  IndexQueue initialQueue;
+  initIndexQueue(&initialQueue);
+  // Initialize with the first substring at index 0
+  pushIndexQueue(&initialQueue, 0);
+  windowSlide.insert({packToUInt32(input), initialQueue});
+
+  // Initialize the output with the first MIN_MATCH bytes as literals
   for (int i = 1; i <= MIN_MATCH; i++) {
-    // Initialize the output with the first MIN_MATCH bytes as literals
     output[i] = input[i - 1];
   }
+
   // For each byte in the input
   for (int i = MIN_MATCH; i < inputSize; i++) {
-    //std::cout << slidingWindowStart << " " << slidingWindowEnd << std::endl;
-    //std::cout << "Current window: " << std::string(input + slidingWindowStart, slidingWindowEnd - slidingWindowStart + 1) << std::endl;
-    std::string currentSubstring;
-    if (i + MIN_MATCH <= inputSize) {     
-      currentSubstring.assign(input + i, MIN_MATCH);
-    }
-    else {
-      // If we are at the end of the input, we can't form a full MIN_MATCH substring
-      currentSubstring = ""; // Set to empty so it doesn't match anything
-    }
-    int longestMatchLength = 1;
+    uint32_t currentSubstring;    
+    currentSubstring = packToUInt32(input + i);
+
+    int longestMatchLength = 1; // Equal 1 when no match is found
     int longestMatchOffset = 0;
     // Check if the current substring exists in the sliding window
-    if (windowSlide.find(currentSubstring) != windowSlide.end()) {
-      // Found a match, now find the longest match
-      //std::cout << "Found match for: " << currentSubstring << std::endl;
-      //std::cout << "Indices in sliding window: ";
-      for (int index : windowSlide[currentSubstring]) {
-        //std::cout << index << " ";
-      }
+    if (windowSlide.contains(currentSubstring) && i + MIN_MATCH <= inputSize) {
+      
+      int headQueue = windowSlide[currentSubstring].head;
+      int tailQueue = windowSlide[currentSubstring].tail;
+
       // For each starting index of the current substring in the sliding window
-      for (int startIndex : windowSlide[currentSubstring]) {
+      for (int j = 0; j < windowSlide[currentSubstring].length; j++) {
+        int queueIndex = (headQueue + j) % MAX_OCCURRENCE_PER_SUBSTRING;
+        int startIndex = windowSlide[currentSubstring].buffer[queueIndex];
         int matchLength = MIN_MATCH;
         // Check how long the match continues
         while (1) {
-          int currentIndex = startIndex + matchLength;
+          int currentIndex = startIndex + matchLength; // Index in the slidng window
+          int lookaheadIndex = i + matchLength; // Index in the input
+          /*printf("Checking match at index %d, lookahead index %d\n", currentIndex, lookaheadIndex);*/
+
           if (currentIndex <= slidingWindowEnd &&
-              matchLength < MAX_MATCH && i + matchLength < inputSize &&
-              input[currentIndex] == input[i + matchLength]) {
+            lookaheadIndex < inputSize &&
+            matchLength < MAX_MATCH &&
+            input[currentIndex] == input[lookaheadIndex]) {
             matchLength++;
-          } else {
+          }
+          else {
             break; // No longer matching
           }
         }
-        
+
         if (matchLength > longestMatchLength) {
           longestMatchLength = matchLength;
           longestMatchOffset = i - startIndex;
         }
+
       }
-      //std::cout << "Longest match length: " << longestMatchLength << ", offset: " << longestMatchOffset << std::endl;
+
       // Pack the token and write it to output
       LZSSPackedToken packedToken = packToken(longestMatchOffset, longestMatchLength);
       output[outputSize] = packedToken >> 8; // First byte
@@ -103,7 +95,6 @@ int lzssEncode(const char* input, int inputSize, char* output) {
     }
     else {
       // No match found, write the literal byte
-      //std::cout << "No match found for: " << currentSubstring << std::endl;
       output[outputSize] = input[i];
       outputSize++;
       flagCounter++;
@@ -115,36 +106,40 @@ int lzssEncode(const char* input, int inputSize, char* output) {
       flagPos = outputSize; // Update flag position for next byte
       flagByte = 0x00; // Reset the flag byte
       flagCounter = 0; // Reset the counter
-      if (i != inputSize - 1) {
-        outputSize++; 
+      if (i < inputSize - 1) {
+        outputSize++; // Don't increment if at the end of input
       }
     }
-    // std::cout << "Current output size: " << outputSize << std::endl;
     // Adding new substrings to the sliding window
     for (int j = 0; j < longestMatchLength; j++) {
       slidingWindowEnd++;
       int newIndex = slidingWindowEnd - MIN_MATCH + 1;
+      uint32_t newSubstring = packToUInt32(input + newIndex);
 
-      std::string newSubstring(input + newIndex, MIN_MATCH);
-      windowSlide[newSubstring].push_back(newIndex);
-      //std::cout << "Adding new substring: " << newSubstring << " at index " << newIndex << std::endl;
+      if (!windowSlide.contains(newSubstring)) {
+        // If the substring is not already in the map, create a new queue
+        IndexQueue newIndexQueue;
+        initIndexQueue(&newIndexQueue);
+        windowSlide[newSubstring] = newIndexQueue;
+      }
+      // Add the new index to the queue for this substring
+      pushIndexQueue(&windowSlide[newSubstring], newIndex);
     }
-
+    
+    // Remove oldest substrings if the sliding window exceeds the size
     while (slidingWindowEnd - slidingWindowStart + 1 > WINDOW_SIZE) {
-      // If the sliding window exceeds the size, remove the oldest entry
-      std::string oldestSubstring(input + slidingWindowStart, MIN_MATCH);
-      if (windowSlide.find(oldestSubstring) != windowSlide.end()) {
-        std::deque<int> &indices = windowSlide[oldestSubstring];
-        // remove from the front
-        //std::cout << "Removing oldest substring: " << oldestSubstring << " at index " << slidingWindowStart << std::endl;
-        indices.pop_front();
-        if (indices.empty()) {
+      uint32_t oldestSubstring = packToUInt32(input + slidingWindowStart);
+      if (windowSlide.contains(oldestSubstring)) {
+        IndexQueue &indices = windowSlide[oldestSubstring];
+        // Remove from the front
+        popIndexQueue(&indices);
+        if (indices.length < 1) {
           windowSlide.erase(oldestSubstring); // Remove the entry if no indices left
         }
+ 
       }
       slidingWindowStart++;
     }
-
   }
   return outputSize;
 }
@@ -173,16 +168,18 @@ int lzssDecode(const char* input, int inputSize, char* output) {
       char secondByte = input[inputIndex + 1];
       LZSSPackedToken packedToken = (firstByte << 8) | (secondByte & 0xFF);
       inputIndex += 2;
-      uint16_t offset;
-      uint8_t length;
+      uint16_t offset = 0;
+      uint8_t length = 0;
+      
       unpackToken(packedToken, &offset, &length);
-      std::cout << "Offset: " << offset << ", Length: " << (int)length << std::endl;
+
       // Copy the matched string from the output buffer
       for (int i = 0; i < length; i++) {
         output[outputSize] = output[outputSize - offset];
         outputSize++;
       }
-    } else {
+    } 
+    else {
       // It's a literal byte
       if (inputIndex >= inputSize) {
         break; // No more data
@@ -194,4 +191,47 @@ int lzssDecode(const char* input, int inputSize, char* output) {
     flagCounter++;
   }
   return outputSize;
+}
+
+uint32_t packToUInt32(const char* data) {
+  uint32_t packedUint32 = 0x0000;
+  for (int i = 0; i < MIN_MATCH; i++) {
+    packedUint32 = (packedUint32 << 8) | (unsigned char)(data[i]);
+  }
+  return packedUint32;
+}
+
+int popIndexQueue(IndexQueue* queue) {
+  if (queue->length == 0) {
+    return -1; // Queue is empty
+  }
+  int index = queue->buffer[queue->head];
+  queue->head = (queue->head + 1) % MAX_OCCURRENCE_PER_SUBSTRING;
+  queue->length--;
+  return index;
+}
+
+void pushIndexQueue(IndexQueue* queue, int index) {
+  if (queue->length == MAX_OCCURRENCE_PER_SUBSTRING) {
+    // Queue is full - overwrite oldest element (move head forward)
+    queue->head = (queue->head + 1) % MAX_OCCURRENCE_PER_SUBSTRING;
+    // length stays the same since we're replacing, not adding
+  }
+  else {
+    // Queue has space - increment length
+    queue->length++;
+  }
+
+  queue->buffer[queue->tail] = index;
+  queue->tail = (queue->tail + 1) % MAX_OCCURRENCE_PER_SUBSTRING;
+}
+
+void initIndexQueue(IndexQueue* queue) {
+  queue->head = 0;
+  queue->tail = 0;
+  queue->length = 0;
+  for (int i = 0; i < MAX_OCCURRENCE_PER_SUBSTRING; i++) {
+    queue->buffer[i] = -1; // Initialize with -1
+  }
+  return;
 }
