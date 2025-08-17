@@ -3,7 +3,14 @@
 #include <string.h>
 #include <stdbool.h>
 #include "Tree.h"
-
+// FUNCTION : createNode
+// DESCRIPTION:
+//    Creates a new PathNode with the given name and type (file or directory).
+// PARAMETERS:
+//    const char* name : The name of the node (file or directory).
+//    bool isFile : True if the node is a file, false if it is a directory.
+// RETURNS:
+//    PathNode* : Pointer to the newly created PathNode.
 PathNode* createNode(const char* name, bool isFile) {
   PathNode* node = (PathNode*)malloc(sizeof(PathNode));
   if (!node) {
@@ -18,7 +25,15 @@ PathNode* createNode(const char* name, bool isFile) {
   node->childCount = 0;
   return node;
 }
-
+// FUNCTION : addPathRecursive
+// DESCRIPTION:
+//    Recursively adds a path to the tree structure.
+//    It splits the path into parts and creates nodes for each part.
+// PARAMETERS:
+//    PathNode* current : Pointer to the current node in the tree.
+//    const char* path : The relative path to add.
+// RETURNS:
+//    void
 static void addPathRecursive(PathNode* current, const char* path) {
   // Make a local copy so we can modify safely
   char buffer[512];
@@ -58,11 +73,26 @@ static void addPathRecursive(PathNode* current, const char* path) {
     addPathRecursive(child, slash + 1);
   }
 }
-
+// FUNCTION : addPath
+// DESCRIPTION:
+//    Adds a relative path to the tree structure.
+// PARAMETERS:
+//    PathNode* root : Pointer to the root of the tree structure.
+//    const char* relativePath : The relative path to add.
+// RETURNS:
+//    void
 void addPath(PathNode* root, const char* relativePath) {
   addPathRecursive(root, relativePath);
 }
-
+// FUNCTION : printTreeRecursive
+// DESCRIPTION:
+//    Recursively prints the tree structure starting from the given node.
+// PARAMETERS:
+//    PathNode* node : Pointer to the current node in the tree.
+//    const char* prefix : The prefix to print before the node's name.
+//    bool isLast : True if the node is the last child of its parent, false otherwise.
+// RETURNS:
+//    void
 static void printTreeRecursive(PathNode* node, const char* prefix, bool isLast) {
   if (strcmp(node->relativePath, "ROOT") != 0) {
     printf("%s%s%s\n",
@@ -78,14 +108,26 @@ static void printTreeRecursive(PathNode* node, const char* prefix, bool isLast) 
     printTreeRecursive(node->children[i], newPrefix, i == node->childCount - 1);
   }
 }
-
+// FUNCTION : printTree
+// DESCRIPTION:
+//    Prints the entire tree structure starting from the root node.
+// PARAMETERS:
+//    PathNode* root : Pointer to the root of the tree structure.
+// RETURNS:
+//    void
 void printTree(PathNode* root) {
   printf("ROOT\n");
   for (int i = 0; i < root->childCount; i++) {
     printTreeRecursive(root->children[i], "", i == root->childCount - 1);
   }
 }
-
+// FUNCTION : freeTree
+// DESCRIPTION:
+//    Frees the memory allocated for the tree structure.
+// PARAMETERS:
+//    PathNode* root : Pointer to the root of the tree structure.
+// RETURNS:
+//    void
 void freeTree(PathNode* root) {
   for (int i = 0; i < root->childCount; i++) {
     freeTree(root->children[i]);

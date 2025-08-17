@@ -294,7 +294,8 @@ int addDirectory(FILE* archivePtr, const char* entryPath, PathNode* root) {
   addPath(root, entryPath); // Add the directory to the tree structure
   // Loop through all files and directories in the specified directory
   while (1) {
-    if (strcmp(findFileData->cFileName, ".") != 0 && strcmp(findFileData->cFileName, "..") != 0) {
+    // Ignore current and parent directory entries
+    if (strcmp(findFileData->cFileName, ".") != 0 && strcmp(findFileData->cFileName, "..") != 0) { 
       char fullPath[512];
       snprintf(fullPath, sizeof(fullPath), "%s\\%s", entryPath, (char*)findFileData->cFileName);
       if (isFile(fullPath)) {

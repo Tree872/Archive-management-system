@@ -24,7 +24,7 @@ int main() {
     printMenu(currentArchive);
     promptInt("Enter your choice (1-7): ", &choice);
 		switch (choice) {
-		case 1:
+    case 1: // Create a new archive
       archiveName[0] = '\0'; 
 			promptString("Enter archive name (without extension): ", archiveName, sizeof(archiveName));
 			if (strlen(archiveName) == 0) {
@@ -42,7 +42,8 @@ int main() {
 			root = createNode("ROOT", false); // Reset tree
 			printf("Archive '%s.dsp' created successfully.\n", archiveName);
 			break;
-		case 2:
+
+    case 2: // Open an existing archive
 			archiveName[0] = '\0';
 			promptString("Enter archive name to open (without extension): ", archiveName, sizeof(archiveName));
 			if (strlen(archiveName) == 0) {
@@ -57,7 +58,8 @@ int main() {
 				strcpy_s(currentArchive, sizeof(currentArchive), archiveName);
 			}
 			break;
-		case 3:
+
+    case 3: // Add a file to the archive
 			if (strcmp(currentArchive, "None") == 0) {
 				printf("No archive is currently open. Please create or open an archive first.\n");
 				break;
@@ -76,7 +78,8 @@ int main() {
       entriesAdded++;
 			printf("File '%s' added to archive '%s.dsp'.\n", filePath, currentArchive);
 			break;
-		case 4:
+
+    case 4: // Add a directory to the archive
 			if (strcmp(currentArchive, "None") == 0) {
 				printf("No archive is currently open. Please create or open an archive first.\n");
 				break;
@@ -95,7 +98,8 @@ int main() {
 			entriesAdded = addDirectory(archivePtr, dirPath, root);
 			printf("Directory '%s' added to archive '%s.dsp' with %d entries.\n", dirPath, currentArchive, entriesAdded);
 			break;
-		case 5:
+
+    case 5: // Unpack the archive
 			if (strcmp(currentArchive, "None") == 0) {
 				printf("No archive is currently open. Please create or open an archive first.\n");
 				break;
@@ -104,7 +108,8 @@ int main() {
 			unpackArchive(archivePtr, currentArchive);
 			printf("Archive '%s.dsp' unpacked to directory '%s'.\n", currentArchive, currentArchive);
 			break;
-		case 6:
+
+    case 6: // Display the contents of the archive
 			if (strcmp(currentArchive, "None") == 0) {
 				printf("No archive is currently open. Please create or open an archive first.\n");
 				break;
@@ -116,11 +121,13 @@ int main() {
 			printf("Contents of archive '%s.dsp':\n", currentArchive);
 			printTree(root);
 			break;
-		case 7:
+
+    case 7: // Exit the program
 			if (strcmp(currentArchive, "None") != 0) {
 				closeArchive(archivePtr);
 			}
 			printf("Exiting program.\n");
+      freeTree(root); 
 			return 0;
     default:
       printf("Invalid choice. Please enter a number between 1 and 7.\n");
@@ -131,7 +138,13 @@ int main() {
   freeTree(root);
   return 0;
 }
-
+// FUNCTION: printMenu
+// DESCRIPTION:
+//		Prints the main menu with the current archive name.
+// PARAMETERS:
+//		const char* currentArchive : The name of the currently opened archive.
+// RETURNS:
+//		void
 void printMenu(const char* currentArchive) {
   printf("\nCurrentArchive: %s\n", currentArchive);
   printf("1. Create Archive\n");
