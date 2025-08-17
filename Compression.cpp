@@ -1,6 +1,5 @@
 #include "Compression.h"
-#include "External\robin_hood.h" 
-#include <iostream>
+#include "External\robin_hood.h" // For hash table
 
 // Set the nth bit of x (leftmost bit is 0)
 #define SET_BIT(x, n) ((x) | (0b10000000 >> (n)))
@@ -63,7 +62,6 @@ int lzssEncode(const char* input, int inputSize, char* output) {
         while (1) {
           int currentIndex = startIndex + matchLength; // Index in the slidng window
           int lookaheadIndex = i + matchLength; // Index in the input
-          /*printf("Checking match at index %d, lookahead index %d\n", currentIndex, lookaheadIndex);*/
 
           if (currentIndex <= slidingWindowEnd &&
             lookaheadIndex < inputSize &&

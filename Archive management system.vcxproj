@@ -125,13 +125,13 @@
   <ItemGroup>
     <ClCompile Include="Archive.cpp" />
     <ClCompile Include="Compression.cpp" />
-    <ClCompile Include="ConsoleIO.cpp" />
+    <ClCompile Include="Tree.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Archive.h" />
     <ClInclude Include="Compression.h" />
-    <ClInclude Include="ConsoleIO.h" />
+    <ClInclude Include="Tree.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="test_archive.dsp" />

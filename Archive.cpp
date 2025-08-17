@@ -1,12 +1,11 @@
 #include "Archive.h"
 #include "Compression.h"
-#include "ConsoleIO.h"
+#include "Tree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <Windows.h>
-#include <sys/stat.h>
 #include <stdint.h>
 
 #define CHUNK_SIZE 32768 // 32 KB

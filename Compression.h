@@ -4,7 +4,7 @@
 #define MIN_MATCH 3
 #define MAX_MATCH 18
 #define WINDOW_SIZE 4096
-#define MAX_OCCURRENCE_PER_SUBSTRING 64
+#define MAX_OCCURRENCE_PER_SUBSTRING 32
 
 typedef struct {
   int buffer[MAX_OCCURRENCE_PER_SUBSTRING];
