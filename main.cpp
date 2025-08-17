@@ -7,6 +7,7 @@
 #include <vector>
 #include "Archive.h"
 #include "Compression.h"
+#include "ConsoleIO.h"
 
 void printBinary(const char data) {
   for (int i = 7; i >= 0; i--) {
